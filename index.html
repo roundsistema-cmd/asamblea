@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asamblea Virtual — Propiedad Horizontal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#16212c; --panel-2:#1c2a37; --line:#2a3945;
+    --text:#e8edf2; --muted:#8fa3b3; --brass:#c9a24b; --brass-dim:#9c8043;
+    --ok:#4caf7d; --warn:#e0a13a; --danger:#d1584f; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh;}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 4px;}
+  .eyebrow{letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:var(--brass);margin-bottom:6px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);background:#0c141c;}
+  .topbar .status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--danger);}
+  .dot.on{background:var(--ok);}
+  .wrap{max-width:960px;margin:0 auto;padding:28px 18px 60px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  label{font-size:12px;color:var(--muted);display:block;margin:10px 0 4px;}
+  input,select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:7px;font-size:14px;}
+  input:focus,select:focus,textarea:focus{outline:1px solid var(--brass);}
+  button{cursor:pointer;background:var(--brass);color:#1a1305;border:none;padding:9px 16px;border-radius:7px;font-size:13px;font-weight:600;letter-spacing:.02em;}
+  button:hover{background:#dab35c;}
+  button.secondary{background:transparent;color:var(--text);border:1px solid var(--line);}
+  button.secondary:hover{border-color:var(--brass);}
+  button.danger{background:var(--danger);color:#fff;}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.small{padding:5px 10px;font-size:12px;}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap;}
+  .tab{padding:9px 14px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--brass);border-color:var(--brass);}
+  .hidden{display:none !important;}
+  .center{display:flex;align-items:center;justify-content:center;min-height:80vh;}
+  .choice{display:flex;gap:14px;flex-wrap:wrap;}
+  .choice .card{flex:1;min-width:220px;cursor:pointer;text-align:center;}
+  .choice .card:hover{border-color:var(--brass);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;}
+  .pill.pendiente{background:#33404a;color:var(--muted);}
+  .pill.activa{background:#22402f;color:var(--ok);}
+  .pill.cerrada{background:#402a26;color:var(--danger);}
+  .option-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .option-row:last-child{border-bottom:none;}
+  .bar-bg{flex:1;height:8px;background:var(--panel-2);border-radius:99px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--brass);transition:width .3s ease;}
+  .muted{color:var(--muted);font-size:13px;}
+  .big-num{font-size:32px;font-family:Georgia,serif;color:var(--brass);}
+  .flexbetween{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--brass);padding:10px 18px;border-radius:8px;font-size:13px;z-index:99;}
+  .video-frame{width:100%;background:#000;border-radius:8px;aspect-ratio:16/9;object-fit:cover;display:block;}
+  .video-wrap{position:relative;}
+  .video-badge{position:absolute;top:10px;left:10px;background:rgba(12,20,28,.85);border:1px solid var(--line);padding:3px 10px;border-radius:99px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .mic-indicator{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block;}
+  .mic-indicator.live{background:var(--ok);box-shadow:0 0 0 3px rgba(76,175,125,.25);}
+  .speaker-req{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <strong>Asamblea Virtual</strong>
+    <span class="muted" style="font-size:12px;"> · Propiedad Horizontal</span>
+  </div>
+  <div class="status">
+    <span id="connDot" class="dot"></span>
+    <span id="connLabel">Sin conectar a la base de datos</span>
+  </div>
+</div>
+
+<div class="wrap" id="app">
+
+  <!-- ROLE / ENTRY SCREEN -->
+  <div id="screen-entry" class="center">
+    <div style="width:100%;max-width:520px;">
+      <div class="eyebrow">Bienvenido</div>
+      <h1>¿Cómo desea ingresar?</h1>
+      <p class="muted">Seleccione un rol para continuar.</p>
+      <div class="choice" style="margin-top:18px;">
+        <div class="card" onclick="showScreen('screen-login')">
+          <h3>Copropietario</h3>
+          <p class="muted">Ingrese con su correo y el código entregado por la administración.</p>
+        </div>
+        <div class="card" onclick="showScreen('screen-admin-login')">
+          <h3>Administrador</h3>
+          <p class="muted">Acceda al panel de control de la asamblea.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTICIPANT LOGIN -->
+  <div id="screen-login" class="hidden">
+    <div class="card" style="max-width:420px;margin:60px auto;">
+      <div class="eyebrow">Copropietario</div>
+      <h2>Ingresar a la asamblea</h2>
+      <label>Correo electrónico</label>
+      <input id="loginEmail" type="email" placeholder="nombre@correo.com">
+      <label>Código de acceso</label>
+      <input id="loginCodigo" type="text" placeholder="Código entregado por el administrador">
+      <div class="row" style="margin-top:16px;">
+        <button onclick="participantLogin()">Ingresar</button>
+        <button class="secondary" onclick="showScreen('screen-entry')">Volver</button>
+      </div>
+      <p id="loginMsg" class="muted"></p>
+    </div>
+  </div>
+
+  <!-- PARTICIPANT MAIN -->
+  <div id="screen-participant" class="hidden">
+    <div class="card">
+      <div class="flexbetween">
+        <div>
+          <div class="eyebrow">Sesión</div>
+          <h2 id="pApto">Apartamento</h2>
+          <p class="muted">Torre <span id="pTorre">—</span> · Coeficiente: <span id="pCoef"></span>%</p>
+        </div>
+        <button class="secondary small" onclick="logoutParticipant()">Salir</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Transmisión en vivo</div>
+      <h3>Asamblea — audio y video</h3>
+      <p class="muted">Esta transmisión es de solo lectura: usted ve y escucha al administrador, pero no envía audio ni video.</p>
+      <div class="video-wrap" style="margin-top:10px;">
+        <video id="remoteVideo" class="video-frame" autoplay playsinline></video>
+        <span class="video-badge"><span class="mic-indicator" id="liveDot"></span><span id="liveStatus">Sin conectar</span></span>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="btnJoinLive" onclick="joinLive()">Conectar a la transmisión</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Votación</div>
+      <div id="noQuestion"><h3>No hay una pregunta activa en este momento</h3><p class="muted">Espere a que el administrador abra la votación.</p></div>
+      <div id="questionBox" class="hidden">
+        <h3 id="qText"></h3>
+        <div id="qOptions"></div>
+        <button id="btnVote" onclick="castVote()" style="margin-top:12px;">Votar</button>
+        <p id="voteMsg" class="muted"></p>
+        <div id="qResults" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN LOGIN -->
+  <div id="screen-admin-login" class="hidden">
+    <div class="card" style="max-width:420px;margin:60px auto;">
+      <div class="eyebrow">Administrador</div>
+      <h2>Panel de control</h2>
+      <label>Contraseña de administrador</label>
+      <input id="adminPass" type="password">
+      <div class="row" style="margin-top:16px;">
+        <button onclick="adminLogin()">Ingresar</button>
+        <button class="secondary" onclick="showScreen('screen-entry')">Volver</button>
+      </div>
+      <p id="adminLoginMsg" class="muted"></p>
+    </div>
+  </div>
+
+  <!-- ADMIN DASHBOARD -->
+  <div id="screen-admin" class="hidden">
+    <div class="flexbetween" style="margin-bottom:10px;">
+      <h2>Dashboard de administración</h2>
+      <button class="secondary small" onclick="logoutAdmin()">Salir</button>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="tab-conexion" onclick="switchTab('tab-conexion')">Conexión</div>
+      <div class="tab" data-tab="tab-linea" onclick="switchTab('tab-linea')">En línea</div>
+      <div class="tab" data-tab="tab-datos" onclick="switchTab('tab-datos')">Carga de datos</div>
+      <div class="tab" data-tab="tab-votacion" onclick="switchTab('tab-votacion')">Preguntas y votación</div>
+      <div class="tab" data-tab="tab-audio" onclick="switchTab('tab-audio')">Audio / Video</div>
+    </div>
+
+    <!-- TAB: CONEXIÓN -->
+    <div id="tab-conexion" class="tabpane">
+      <div class="card">
+        <h3>Conexión a Supabase</h3>
+        <p class="muted">Ingrese la URL del proyecto y la clave anónima (anon key). Estos datos no se guardan en el navegador; se aplican solo durante esta sesión.</p>
+        <label>Project URL</label>
+        <input id="cfgUrl" placeholder="https://xxxxx.supabase.co">
+        <label>Anon Key</label>
+        <input id="cfgKey" placeholder="eyJhbGciOi...">
+        <div class="row" style="margin-top:14px;">
+          <button onclick="connectSupabase()">Conectar</button>
+        </div>
+        <p id="cfgMsg" class="muted"></p>
+      </div>
+    </div>
+
+    <!-- TAB: EN LÍNEA -->
+    <div id="tab-linea" class="tabpane hidden">
+      <div class="card">
+        <div class="row">
+          <div class="card" style="flex:1;text-align:center;">
+            <div class="muted">Copropietarios conectados</div>
+            <div class="big-num" id="statCount">0</div>
+          </div>
+          <div class="card" style="flex:1;text-align:center;">
+            <div class="muted">Coeficiente conectado</div>
+            <div class="big-num" id="statCoef">0%</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Usuarios en línea</h3>
+        <table>
+          <thead><tr><th>Apartamento</th><th>Torre</th><th>Coeficiente</th></tr></thead>
+          <tbody id="onlineTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: CARGA DE DATOS -->
+    <div id="tab-datos" class="tabpane hidden">
+      <div class="card">
+        <h3>Cargar desde Excel</h3>
+        <p class="muted">Columnas requeridas: <code>apartamento</code>, <code>torre</code>, <code>email</code>, <code>coeficiente</code>, <code>codigo_acceso</code></p>
+        <input type="file" id="excelFile" accept=".xlsx,.xls">
+        <div class="row" style="margin-top:10px;">
+          <button onclick="loadExcelPreview()">Leer archivo</button>
+          <button class="secondary" id="btnUploadExcel" disabled onclick="uploadExcelRows()">Cargar a la base de datos</button>
+        </div>
+        <div id="excelPreview" style="margin-top:14px;"></div>
+      </div>
+      <div class="card">
+        <h3>Agregar / editar manualmente</h3>
+        <div class="row">
+          <div style="flex:1;min-width:110px;"><label>Apartamento</label><input id="manApto"></div>
+          <div style="flex:1;min-width:90px;"><label>Torre</label><input id="manTorre"></div>
+          <div style="flex:1;min-width:160px;"><label>Correo</label><input id="manEmail" type="email"></div>
+          <div style="flex:1;min-width:100px;"><label>Coeficiente</label><input id="manCoef" type="number" step="0.0001"></div>
+          <div style="flex:1;min-width:120px;"><label>Código de acceso</label><input id="manCodigo"></div>
+        </div>
+        <button style="margin-top:12px;" onclick="manualAddPropietario()">Guardar</button>
+        <p id="manMsg" class="muted"></p>
+      </div>
+      <div class="card">
+        <h3>Copropietarios registrados</h3>
+        <button class="secondary small" onclick="refreshPropietarios()">Actualizar lista</button>
+        <table style="margin-top:10px;">
+          <thead><tr><th>Apartamento</th><th>Torre</th><th>Correo</th><th>Coef.</th><th>Código</th></tr></thead>
+          <tbody id="propTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: VOTACIÓN -->
+    <div id="tab-votacion" class="tabpane hidden">
+      <div class="card">
+        <h3>Asamblea activa</h3>
+        <div class="row" id="asambleaBox">
+          <div style="flex:1;min-width:220px;">
+            <label>Nombre de la asamblea</label>
+            <input id="asambleaNombre" placeholder="Ej: Asamblea ordinaria 2026">
+          </div>
+        </div>
+        <button onclick="createAsamblea()">Crear nueva asamblea</button>
+        <p class="muted" id="asambleaMsg"></p>
+      </div>
+      <div class="card">
+        <h3>Nueva pregunta</h3>
+        <label>Texto de la pregunta</label>
+        <input id="newQText" placeholder="¿Aprueba el presupuesto 2027?">
+        <label>Opciones (separadas por coma)</label>
+        <input id="newQOpts" placeholder="A favor, En contra, Abstención">
+        <button style="margin-top:12px;" onclick="createPregunta()">Crear pregunta</button>
+      </div>
+      <div class="card">
+        <h3>Preguntas de la asamblea</h3>
+        <div id="preguntasList"></div>
+      </div>
+    </div>
+
+    <!-- TAB: AUDIO / VIDEO -->
+    <div id="tab-audio" class="tabpane hidden">
+      <div class="card">
+        <h3>Transmisión del administrador</h3>
+        <p class="muted">Los copropietarios reciben este audio y video en tiempo real; ellos no transmiten su propia cámara ni micrófono.</p>
+        <div class="video-wrap" style="max-width:480px;">
+          <video id="adminSelfView" class="video-frame" autoplay playsinline muted></video>
+          <span class="video-badge"><span class="mic-indicator" id="adminMicDot"></span><span id="adminAudioStatus">Sin iniciar</span></span>
+        </div>
+        <div class="row" style="align-items:center;margin-top:12px;">
+          <button id="btnAdminAudio" onclick="startBroadcast()">Iniciar transmisión</button>
+          <button id="btnToggleVideo" class="secondary" disabled onclick="toggleAdminVideo()">Bloquear video</button>
+        </div>
+        <p class="muted" style="margin-top:6px;">Al bloquear el video, los copropietarios siguen escuchando el audio pero la imagen se detiene.</p>
+      </div>
+      <div class="card">
+        <h3>Copropietarios viendo la transmisión</h3>
+        <div id="participantsAudioList" class="muted">Nadie conectado todavía.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   ESTADO GLOBAL
+   ===================================================================== */
+const State = {
+  supabase: null,
+  connected: false,
+  adminPassword: null,
+  participant: null,      // {id, apartamento, torre, coeficiente}
+  presenceChannel: null,
+  signalChannel: null,
+  currentAsambleaId: null,
+  activePregunta: null,
+  adminLocalStream: null,  // admin mic + camera
+  videoEnabled: true,
+  peerConnections: {},     // admin: {participantId: RTCPeerConnection}
+  adminPeer: null,         // participant: single RTCPeerConnection to admin
+  myPeerId: null
+};
+
+const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+/* Credenciales de Supabase del proyecto — la app se conecta sola al cargar.
+   La pestaña "Conexión" del admin permite verificarlas o cambiarlas si el
+   proyecto cambia, pero no es un paso obligatorio para el usuario final. */
+const DEFAULT_SUPABASE_URL = 'https://zmtqbfodbypzafbfvwny.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptdHFiZm9kYnlwemFmYmZ2d255Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0OTUzNzgsImV4cCI6MjEwMjA3MTM3OH0.emY-9WZDYVUdZi4-kJrxkAKQPPupNTqN53SYyONUphc';
+
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+
+function showScreen(id){
+  document.querySelectorAll('#app > div').forEach(d=>d.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('hidden', p.id!==id));
+  if(id==='tab-linea') refreshOnlineStats();
+  if(id==='tab-datos') refreshPropietarios();
+  if(id==='tab-votacion') refreshPreguntas();
+}
+
+/* =====================================================================
+   CONEXIÓN A SUPABASE
+   ===================================================================== */
+function connectSupabase(){
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  if(!url || !key){ document.getElementById('cfgMsg').textContent = 'Ingrese la URL y la anon key.'; return; }
+  try{
+    State.supabase = window.supabase.createClient(url, key);
+    State.connected = true;
+    document.getElementById('connDot').classList.add('on');
+    document.getElementById('connLabel').textContent = 'Conectado a Supabase';
+    document.getElementById('cfgMsg').textContent = 'Conexión establecida correctamente.';
+    toast('Conectado a la base de datos');
+  }catch(e){
+    document.getElementById('cfgMsg').textContent = 'Error al conectar: ' + e.message;
+  }
+}
+
+function requireConnection(){
+  if(!State.connected){
+    toast('Primero conecte la aplicación a Supabase (pestaña Conexión del panel admin).');
+    return false;
+  }
+  return true;
+}
+
+/* =====================================================================
+   LOGIN COPROPIETARIO
+   ===================================================================== */
+async function participantLogin(){
+  if(!requireConnection()) return;
+  const email = document.getElementById('loginEmail').value.trim();
+  const codigo = document.getElementById('loginCodigo').value.trim();
+  const msg = document.getElementById('loginMsg');
+  if(!email || !codigo){ msg.textContent = 'Complete correo y código.'; return; }
+  const { data, error } = await State.supabase.rpc('verificar_acceso', { p_email: email, p_codigo: codigo });
+  if(error){ msg.textContent = 'Error: ' + error.message; return; }
+  if(!data || data.length===0){ msg.textContent = 'Correo o código incorrecto.'; return; }
+  State.participant = data[0];
+  State.myPeerId = 'p_' + State.participant.id;
+  document.getElementById('pApto').textContent = 'Apto ' + State.participant.apartamento;
+  document.getElementById('pTorre').textContent = State.participant.torre || '—';
+  document.getElementById('pCoef').textContent = State.participant.coeficiente;
+  showScreen('screen-participant');
+  await joinPresence();
+  subscribeToPreguntas();
+  setupParticipantSignaling();
+  loadActivePregunta();
+}
+
+function logoutParticipant(){
+  leaveLive();
+  if(State.presenceChannel) State.supabase.removeChannel(State.presenceChannel);
+  if(State.signalChannel) State.supabase.removeChannel(State.signalChannel);
+  State.participant = null;
+  showScreen('screen-entry');
+}
+
+/* =====================================================================
+   PRESENCIA (usuarios en línea + coeficiente conectado)
+   ===================================================================== */
+async function joinPresence(){
+  State.presenceChannel = State.supabase.channel('presencia-asamblea', {
+    config: { presence: { key: State.participant.id } }
+  });
+  State.presenceChannel.subscribe(async (status) => {
+    if(status === 'SUBSCRIBED'){
+      await State.presenceChannel.track({
+        apartamento: State.participant.apartamento,
+        torre: State.participant.torre,
+        coeficiente: State.participant.coeficiente
+      });
+    }
+  });
+}
+
+function getOnlineList(){
+  if(!State.presenceChannel) return [];
+  const state = State.presenceChannel.presenceState();
+  const list = [];
+  Object.values(state).forEach(entries => entries.forEach(e => list.push(e)));
+  return list;
+}
+
+/* =====================================================================
+   AUDIO + VIDEO — SEÑALIZACIÓN WEBRTC PROPIA VÍA SUPABASE REALTIME
+   Topología en estrella: el administrador es el único que transmite
+   (cámara + micrófono). Cada copropietario abre una conexión directa
+   receive-only con el administrador; no envían audio ni video propio.
+   No se usa ningún SDK ni servicio externo de videoconferencia: la
+   señalización SDP/ICE viaja por un canal broadcast de Supabase Realtime
+   y los medios fluyen peer-to-peer por WebRTC nativo del navegador.
+   ===================================================================== */
+function getSignalChannel(){
+  if(!State.signalChannel){
+    State.signalChannel = State.supabase.channel('webrtc-signal', { config:{ broadcast:{ self:false } } });
+  }
+  return State.signalChannel;
+}
+
+function setupParticipantSignaling(){
+  const ch = getSignalChannel();
+  ch.on('broadcast', { event: 'signal' }, ({ payload }) => {
+    if(payload.to !== State.myPeerId) return;
+    handleParticipantSignal(payload);
+  });
+  ch.subscribe();
+}
+
+async function joinLive(){
+  if(!requireConnection()) return;
+  document.getElementById('liveStatus').textContent = 'Conectando...';
+  getSignalChannel().send({
+    type: 'broadcast', event: 'signal',
+    payload: { type: 'join', from: State.myPeerId }
+  });
+  document.getElementById('btnJoinLive').disabled = true;
+}
+
+async function handleParticipantSignal(payload){
+  if(payload.type === 'offer'){
+    State.adminPeer = new RTCPeerConnection(RTC_CONFIG);
+    State.adminPeer.onicecandidate = (e)=>{
+      if(e.candidate) getSignalChannel().send({type:'broadcast',event:'signal',payload:{type:'ice',to:'admin',from:State.myPeerId,candidate:e.candidate}});
+    };
+    State.adminPeer.ontrack = (e)=>{
+      const v = document.getElementById('remoteVideo');
+      if(v.srcObject !== e.streams[0]) v.srcObject = e.streams[0];
+      document.getElementById('liveDot').classList.add('live');
+      document.getElementById('liveStatus').textContent = 'En vivo';
+    };
+    await State.adminPeer.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+    const answer = await State.adminPeer.createAnswer();
+    await State.adminPeer.setLocalDescription(answer);
+    getSignalChannel().send({type:'broadcast',event:'signal',payload:{type:'answer',to:'admin',from:State.myPeerId,sdp:answer}});
+  } else if(payload.type === 'ice'){
+    if(State.adminPeer) await State.adminPeer.addIceCandidate(payload.candidate).catch(()=>{});
+  }
+}
+
+function leaveLive(){
+  if(State.adminPeer){ State.adminPeer.close(); State.adminPeer = null; }
+  const v = document.getElementById('remoteVideo');
+  if(v) v.srcObject = null;
+}
+
+/* ---- lado ADMIN de la señalización ---- */
+function setupAdminSignaling(){
+  const ch = getSignalChannel();
+  ch.on('broadcast', { event: 'signal' }, ({ payload }) => {
+    if(payload.type === 'join'){
+      createAdminPeerFor(payload.from);
+    } else if(payload.type === 'answer' && payload.to === 'admin'){
+      const pc = State.peerConnections[payload.from];
+      if(pc) pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+    } else if(payload.type === 'ice' && payload.to === 'admin'){
+      const pc = State.peerConnections[payload.from];
+      if(pc) pc.addIceCandidate(payload.candidate).catch(()=>{});
+    }
+  });
+  ch.subscribe();
+}
+
+async function startBroadcast(){
+  if(!requireConnection()) return;
+  try{
+    State.adminLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+  }catch(e){ toast('No se pudo acceder a la cámara/micrófono.'); return; }
+  document.getElementById('adminSelfView').srcObject = State.adminLocalStream;
+  document.getElementById('adminMicDot').classList.add('live');
+  document.getElementById('adminAudioStatus').textContent = 'Transmitiendo';
+  document.getElementById('btnAdminAudio').textContent = 'Transmisión activa';
+  document.getElementById('btnAdminAudio').disabled = true;
+  document.getElementById('btnToggleVideo').disabled = false;
+  State.videoEnabled = true;
+  setupAdminSignaling();
+}
+
+function toggleAdminVideo(){
+  if(!State.adminLocalStream) return;
+  State.videoEnabled = !State.videoEnabled;
+  State.adminLocalStream.getVideoTracks().forEach(t => t.enabled = State.videoEnabled);
+  document.getElementById('btnToggleVideo').textContent = State.videoEnabled ? 'Bloquear video' : 'Permitir video';
+  toast(State.videoEnabled ? 'Video habilitado para todos.' : 'Video bloqueado; solo audio para los copropietarios.');
+}
+
+async function createAdminPeerFor(participantPeerId){
+  if(State.peerConnections[participantPeerId]) return;
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  State.peerConnections[participantPeerId] = pc;
+  if(State.adminLocalStream){
+    State.adminLocalStream.getTracks().forEach(t => pc.addTrack(t, State.adminLocalStream));
+  }
+  pc.onicecandidate = (e)=>{
+    if(e.candidate) getSignalChannel().send({type:'broadcast',event:'signal',payload:{type:'ice',to:participantPeerId,from:'admin',candidate:e.candidate}});
+  };
+  pc.onconnectionstatechange = ()=>{
+    if(['disconnected','failed','closed'].includes(pc.connectionState)){
+      delete State.peerConnections[participantPeerId];
+      const row = document.getElementById('row-'+participantPeerId);
+      if(row) row.remove();
+      const box = document.getElementById('participantsAudioList');
+      if(box && !box.children.length) box.innerHTML = '<span class="muted">Nadie conectado todavía.</span>';
+    }
+  };
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  getSignalChannel().send({type:'broadcast',event:'signal',payload:{type:'offer',to:participantPeerId,from:'admin',sdp:offer}});
+  renderViewer(participantPeerId);
+}
+
+function renderViewer(peerId){
+  const box = document.getElementById('participantsAudioList');
+  if(document.getElementById('row-'+peerId)) return;
+  if(box.querySelector('.muted')) box.innerHTML = '';
+  const row = document.createElement('div');
+  row.id = 'row-'+peerId;
+  row.className = 'speaker-req';
+  row.innerHTML = `<span>${peerId.replace('p_','Copropietario ')}</span><span class="muted">Viendo</span>`;
+  box.appendChild(row);
+}
+
+/* =====================================================================
+   VOTACIÓN — PARTICIPANTE
+   ===================================================================== */
+function subscribeToPreguntas(){
+  State.supabase.channel('preguntas-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'preguntas' }, () => loadActivePregunta())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, () => { if(State.activePregunta) renderParticipantResults(State.activePregunta.id); })
+    .subscribe();
+}
+
+async function loadActivePregunta(){
+  const { data, error } = await State.supabase.from('preguntas').select('*').eq('estado','activa').order('created_at',{ascending:false}).limit(1);
+  if(error) return;
+  if(!data || data.length===0){
+    State.activePregunta = null;
+    document.getElementById('noQuestion').classList.remove('hidden');
+    document.getElementById('questionBox').classList.add('hidden');
+    return;
+  }
+  State.activePregunta = data[0];
+  document.getElementById('noQuestion').classList.add('hidden');
+  document.getElementById('questionBox').classList.remove('hidden');
+  document.getElementById('qText').textContent = State.activePregunta.texto;
+  const optsBox = document.getElementById('qOptions');
+  optsBox.innerHTML = '';
+  State.activePregunta.opciones.forEach(op=>{
+    const id = 'opt_' + op.replace(/\s+/g,'_');
+    optsBox.innerHTML += `<label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin:6px 0;">
+      <input type="radio" name="voteOpt" value="${op}" id="${id}"> ${op}</label>`;
+  });
+  const { data: ya } = await State.supabase.rpc('ya_voto', { p_pregunta_id: State.activePregunta.id, p_propietario_id: State.participant.id });
+  document.getElementById('btnVote').disabled = !!ya;
+  document.getElementById('voteMsg').textContent = ya ? 'Ya registró su voto en esta pregunta.' : '';
+  renderParticipantResults(State.activePregunta.id);
+}
+
+async function castVote(){
+  const sel = document.querySelector('input[name="voteOpt"]:checked');
+  if(!sel){ document.getElementById('voteMsg').textContent = 'Seleccione una opción.'; return; }
+  const { data, error } = await State.supabase.rpc('registrar_voto', {
+    p_pregunta_id: State.activePregunta.id, p_propietario_id: State.participant.id, p_opcion: sel.value
+  });
+  if(error){ document.getElementById('voteMsg').textContent = 'Error: ' + error.message; return; }
+  const map = { ok:'Voto registrado.', ya_voto:'Ya había votado.', votacion_cerrada:'La votación fue cerrada.', propietario_no_valido:'Sesión inválida.' };
+  document.getElementById('voteMsg').textContent = map[data] || data;
+  if(data === 'ok'){ document.getElementById('btnVote').disabled = true; renderParticipantResults(State.activePregunta.id); }
+}
+
+async function renderParticipantResults(preguntaId){
+  const { data } = await State.supabase.rpc('resultados_pregunta', { p_pregunta_id: preguntaId });
+  if(!data) return;
+  const box = document.getElementById('qResults');
+  const total = data.coeficiente_votado || 0;
+  box.innerHTML = '<div class="eyebrow">Resultados en vivo</div>';
+  Object.entries(data.por_opcion || {}).forEach(([op,val])=>{
+    const pct = total>0 ? (val/total*100).toFixed(1) : 0;
+    box.innerHTML += `<div class="option-row"><span style="min-width:140px;">${op}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;"></div></div>
+      <span class="muted" style="min-width:70px;text-align:right;">${pct}% (${val})</span></div>`;
+  });
+}
+
+/* =====================================================================
+   ADMIN LOGIN
+   ===================================================================== */
+async function adminLogin(){
+  if(!requireConnection()) return;
+  const pass = document.getElementById('adminPass').value;
+  const { data, error } = await State.supabase.rpc('admin_verificar_password', { p_password: pass });
+  if(error){ document.getElementById('adminLoginMsg').textContent = 'Error: ' + error.message; return; }
+  if(!data){ document.getElementById('adminLoginMsg').textContent = 'Contraseña incorrecta.'; return; }
+  State.adminPassword = pass;
+  showScreen('screen-admin');
+  switchTab('tab-conexion');
+  await joinAdminPresenceWatch();
+  subscribeAdminToPreguntas();
+  refreshPreguntas();
+}
+function logoutAdmin(){ State.adminPassword = null; showScreen('screen-entry'); }
+
+/* Admin también escucha la presencia para el conteo en vivo */
+async function joinAdminPresenceWatch(){
+  State.presenceChannel = State.supabase.channel('presencia-asamblea', { config:{ presence:{ key:'admin' } } });
+  State.presenceChannel.on('presence', { event: 'sync' }, refreshOnlineStats);
+  State.presenceChannel.subscribe();
+}
+
+function refreshOnlineStats(){
+  const list = getOnlineList();
+  document.getElementById('statCount').textContent = list.length;
+  const totalCoef = list.reduce((a,e)=>a+Number(e.coeficiente||0),0);
+  document.getElementById('statCoef').textContent = totalCoef.toFixed(2) + '%';
+  const tbody = document.getElementById('onlineTable');
+  tbody.innerHTML = list.map(e=>`<tr><td>${e.apartamento}</td><td>${e.torre||'—'}</td><td>${e.coeficiente}%</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Nadie en línea</td></tr>';
+}
+
+/* =====================================================================
+   CARGA DE DATOS — EXCEL Y MANUAL
+   ===================================================================== */
+let excelRows = [];
+function loadExcelPreview(){
+  const file = document.getElementById('excelFile').files[0];
+  if(!file){ toast('Seleccione un archivo primero.'); return; }
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    excelRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    const box = document.getElementById('excelPreview');
+    if(excelRows.length===0){ box.innerHTML = '<p class="muted">El archivo no tiene filas.</p>'; return; }
+    let html = '<table><thead><tr><th>Apartamento</th><th>Torre</th><th>Correo</th><th>Coeficiente</th><th>Código</th></tr></thead><tbody>';
+    excelRows.forEach(r=>{
+      html += `<tr><td>${r.apartamento||''}</td><td>${r.torre||''}</td><td>${r.email||''}</td><td>${r.coeficiente||''}</td><td>${r.codigo_acceso||''}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    document.getElementById('btnUploadExcel').disabled = false;
+  };
+  reader.readAsArrayBuffer(file);
+}
+async function uploadExcelRows(){
+  let ok=0, fail=0;
+  for(const r of excelRows){
+    const { error } = await State.supabase.rpc('admin_upsert_propietario', {
+      p_admin_password: State.adminPassword, p_apartamento: String(r.apartamento||''), p_torre: String(r.torre||''),
+      p_email: String(r.email||''), p_coeficiente: Number(r.coeficiente||0), p_codigo: String(r.codigo_acceso||'')
+    });
+    if(error) fail++; else ok++;
+  }
+  toast(`Cargados: ${ok}. Errores: ${fail}.`);
+  refreshPropietarios();
+}
+async function manualAddPropietario(){
+  const apto = document.getElementById('manApto').value.trim();
+  const torre = document.getElementById('manTorre').value.trim();
+  const email = document.getElementById('manEmail').value.trim();
+  const coef = Number(document.getElementById('manCoef').value);
+  const codigo = document.getElementById('manCodigo').value.trim();
+  if(!apto||!email||!codigo){ document.getElementById('manMsg').textContent='Complete todos los campos.'; return; }
+  const { error } = await State.supabase.rpc('admin_upsert_propietario', { p_admin_password: State.adminPassword, p_apartamento: apto, p_torre: torre, p_email: email, p_coeficiente: coef, p_codigo: codigo });
+  document.getElementById('manMsg').textContent = error ? 'Error: ' + error.message : 'Guardado correctamente.';
+  if(!error){ ['manApto','manTorre','manEmail','manCoef','manCodigo'].forEach(id=>document.getElementById(id).value=''); refreshPropietarios(); }
+}
+async function refreshPropietarios(){
+  const { data, error } = await State.supabase.rpc('admin_listar_propietarios', { p_admin_password: State.adminPassword });
+  if(error) return;
+  document.getElementById('propTable').innerHTML = (data||[]).map(p=>
+    `<tr><td>${p.apartamento}</td><td>${p.torre||'—'}</td><td>${p.email}</td><td>${p.coeficiente}%</td><td>${p.codigo_acceso}</td></tr>`
+  ).join('') || '<tr><td colspan="5" class="muted">Sin registros</td></tr>';
+}
+
+/* =====================================================================
+   ASAMBLEA Y PREGUNTAS — ADMIN
+   ===================================================================== */
+async function createAsamblea(){
+  const nombre = document.getElementById('asambleaNombre').value.trim();
+  if(!nombre){ return; }
+  const { data, error } = await State.supabase.rpc('admin_crear_asamblea', { p_admin_password: State.adminPassword, p_nombre: nombre });
+  if(error){ document.getElementById('asambleaMsg').textContent = 'Error: ' + error.message; return; }
+  State.currentAsambleaId = data;
+  document.getElementById('asambleaMsg').textContent = 'Asamblea creada: ' + nombre;
+  toast('Asamblea creada');
+}
+async function ensureAsamblea(){
+  if(State.currentAsambleaId) return State.currentAsambleaId;
+  const { data } = await State.supabase.from('asambleas').select('id').eq('activa',true).order('created_at',{ascending:false}).limit(1);
+  if(data && data.length){ State.currentAsambleaId = data[0].id; return data[0].id; }
+  return null;
+}
+async function createPregunta(){
+  const asambleaId = await ensureAsamblea();
+  if(!asambleaId){ toast('Cree primero una asamblea.'); return; }
+  const texto = document.getElementById('newQText').value.trim();
+  const opts = document.getElementById('newQOpts').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!texto || opts.length<2){ toast('Ingrese la pregunta y al menos dos opciones.'); return; }
+  const { error } = await State.supabase.rpc('admin_crear_pregunta', { p_admin_password: State.adminPassword, p_asamblea_id: asambleaId, p_texto: texto, p_opciones: opts, p_orden: 0 });
+  if(error){ toast('Error: ' + error.message); return; }
+  document.getElementById('newQText').value=''; document.getElementById('newQOpts').value='';
+  refreshPreguntas();
+}
+function subscribeAdminToPreguntas(){
+  State.supabase.channel('admin-preguntas-votos')
+    .on('postgres_changes', { event:'*', schema:'public', table:'preguntas' }, refreshPreguntas)
+    .on('postgres_changes', { event:'*', schema:'public', table:'votos' }, refreshPreguntas)
+    .subscribe();
+}
+async function refreshPreguntas(){
+  const { data, error } = await State.supabase.from('preguntas').select('*').order('created_at',{ascending:false});
+  if(error) return;
+  const box = document.getElementById('preguntasList');
+  if(!data || data.length===0){ box.innerHTML = '<p class="muted">Aún no hay preguntas creadas.</p>'; return; }
+  let html = '';
+  for(const q of data){
+    const res = await State.supabase.rpc('resultados_pregunta', { p_pregunta_id: q.id });
+    const votado = (res.data && res.data.coeficiente_votado) || 0;
+    const quorumEnVivo = getOnlineList().reduce((a,e)=>a+Number(e.coeficiente||0),0);
+    const pctQuorum = quorumEnVivo>0 ? (votado/quorumEnVivo*100).toFixed(1) : '0.0';
+    html += `<div class="card" style="background:var(--panel-2);">
+      <div class="flexbetween">
+        <div><strong>${q.texto}</strong> <span class="pill ${q.estado}">${q.estado}</span></div>
+        <div class="row">
+          <button class="small" ${q.estado==='activa'?'disabled':''} onclick="setEstadoPregunta('${q.id}','activa')">Activar</button>
+          <button class="small danger" ${q.estado!=='activa'?'disabled':''} onclick="setEstadoPregunta('${q.id}','cerrada')">Detener</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:8px 0;">Coeficiente votado: ${votado.toFixed(2)}% de ${quorumEnVivo.toFixed(2)}% conectado en vivo (${pctQuorum}%)</p>`;
+    if(res.data){
+      Object.entries(res.data.por_opcion||{}).forEach(([op,val])=>{
+        const pct = votado>0 ? (val/votado*100).toFixed(1) : 0;
+        html += `<div class="option-row"><span style="min-width:140px;">${op}</span>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;"></div></div>
+          <span class="muted" style="min-width:70px;text-align:right;">${pct}% (${val})</span></div>`;
+      });
+      const aptos = res.data.apartamentos_votaron || [];
+      html += `<p class="muted" style="margin-top:8px;">Apartamentos que ya votaron (${aptos.length}): ${aptos.length ? aptos.join(', ') : '—'}</p>`;
+    }
+    html += `</div>`;
+  }
+  box.innerHTML = html;
+}
+async function setEstadoPregunta(id, estado){
+  const { error } = await State.supabase.rpc('admin_set_estado_pregunta', { p_admin_password: State.adminPassword, p_pregunta_id: id, p_estado: estado });
+  if(error){ toast('Error: ' + error.message); return; }
+  refreshPreguntas();
+}
+
+/* =====================================================================
+   ARRANQUE — conecta automáticamente con las credenciales del proyecto
+   ===================================================================== */
+function initApp(){
+  document.getElementById('cfgUrl').value = DEFAULT_SUPABASE_URL;
+  document.getElementById('cfgKey').value = DEFAULT_SUPABASE_ANON_KEY;
+  connectSupabase();
+}
+document.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>
